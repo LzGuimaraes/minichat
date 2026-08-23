@@ -27,6 +27,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: 22
           strip_components: 0
           source: "src,public,scripts,package.json,package-lock.json,next.config.ts,tsconfig.json,eslint.config.mjs,Dockerfile,docker-compose.yml,.dockerignore"
@@ -42,6 +43,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: 22
           envs: CHAT_ACCESS_KEY,CHAT_SESSION_SECRET,CHAT_CLEANUP_KEY
           script: |
