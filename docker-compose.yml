@@ -1,0 +1,58 @@
+# NÚCLEO mini chat — Docker Compose (deploy na VPS)
+#
+# IMPORTANTE (ajuste para a SUA VPS):
+# 1. REDE: o serviço entra na MESMA rede Docker onde o Traefik roda,
+#    para o roteamento por labels funcionar. Descubra o nome com:
+#      docker network ls
+#    e troque "proxy" abaixo pelo nome correto (ex.: traefik, web, proxy).
+#
+# 2. ENTRYPOINT: confirme o nome do entrypoint HTTPS no seu Traefik
+#    (geralmente "websecure"; pode ser "https").
+#
+# 3. CERTRESOLVER: troque "letsencrypt" pelo nome do seu certResolver
+#    (veja o arquivo de config/rotas do Traefik; exemplos: letsencrypt, le, cloudflare).
+#
+# 4. DOMÍNIO: já configurado para chat.lzguimaraes.com.br.
+
+services:
+  minichat:
+    build:
+      context: .
+    image: minichat:latest
+    container_name: minichat
+    restart: unless-stopped
+
+    # Segredos vêm do .env (criado no servidor pelo workflow do GitHub Actions)
+    env_file:
+      - .env
+
+    environment:
+      # Banco e uploads ficam no volume persistente, não no código
+      CHAT_DB_PATH: /data/chat.db
+      CHAT_UPLOADS_PATH: /data/uploads
+
+    volumes:
+      - chat_data:/data
+
+    # Publica APENAS no loopback do host (para a cron de limpeza e debug).
+    # O acesso público é feito exclusivamente pelo Traefik (portas 80/443).
+    ports:
+      - "127.0.0.1:25000:25000"
+
+    networks:
+      - proxy
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minichat.rule=Host(`chat.lzguimaraes.com.br`)"
+      - "traefik.http.routers.minichat.entrypoints=websecure"
+      - "traefik.http.routers.minichat.tls=true"
+      - "traefik.http.routers.minichat.tls.certresolver=letsencrypt"
+      - "traefik.http.services.minichat.loadbalancer.server.port=25000"
+
+volumes:
+  chat_data:
+
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,62 @@
+name: Deploy para a VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CHAT_ACCESS_KEY: ${{ secrets.CHAT_ACCESS_KEY }}
+      CHAT_SESSION_SECRET: ${{ secrets.CHAT_SESSION_SECRET }}
+      CHAT_CLEANUP_KEY: ${{ secrets.CHAT_CLEANUP_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enviar arquivos para a VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          strip_components: 0
+          source: "src,public,scripts,package.json,package-lock.json,next.config.ts,tsconfig.json,eslint.config.mjs,Dockerfile,docker-compose.yml,.dockerignore"
+          target: /opt/minichat
+
+      - name: Gerar .env, buildar e subir o container
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          CHAT_ACCESS_KEY: ${{ secrets.CHAT_ACCESS_KEY }}
+          CHAT_SESSION_SECRET: ${{ secrets.CHAT_SESSION_SECRET }}
+          CHAT_CLEANUP_KEY: ${{ secrets.CHAT_CLEANUP_KEY }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          envs: CHAT_ACCESS_KEY,CHAT_SESSION_SECRET,CHAT_CLEANUP_KEY
+          script: |
+            set -e
+            cd /opt/minichat
+
+            # Escreve o .env com permissões restritas (não é versionado)
+            umask 077
+            {
+              echo "CHAT_ACCESS_KEY=${CHAT_ACCESS_KEY}"
+              echo "CHAT_SESSION_SECRET=${CHAT_SESSION_SECRET}"
+              echo "CHAT_CLEANUP_KEY=${CHAT_CLEANUP_KEY}"
+              echo "CHAT_INTERNAL_URL=http://127.0.0.1:25000"
+            } > .env
+
+            # Build + restart (o volume chat_data preserva banco e imagens)
+            docker compose up -d --build --remove-orphans
+            docker compose ps
